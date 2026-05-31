@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+backend/.venv/
+backend/.env
+.pytest_cache/
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+frontend/.env*.local
+npm-debug.log*
+
+# Env
+.env
+.env.local
+
+# Tooling
+.vercel/
+.firecrawl/
+
+# AI
+.claude
+.venv
