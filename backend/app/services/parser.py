@@ -12,12 +12,26 @@ SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".md", ".markdown", ".txt"}
 
 
 class ParsedResume:
-    def __init__(self, text: str, filename: str, file_size: int) -> None:
+    def __init__(self, text: str, filename: str, file_size: int, raw_bytes: bytes = b"") -> None:
         self.text = text
         self.filename = filename
         self.file_size = file_size
+        self.raw_bytes = raw_bytes
         self.word_count = len(text.split())
         self.preview = text[:800]
+
+
+MIME_MAP = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".md": "text/markdown",
+    ".markdown": "text/markdown",
+    ".txt": "text/plain",
+}
+
+
+def detect_mime(filename: str) -> str:
+    return MIME_MAP.get(_extension(filename), "application/octet-stream")
 
 
 def _extension(filename: str) -> str:
@@ -80,7 +94,7 @@ def parse_resume_bytes(filename: str, data: bytes, settings: Settings) -> Parsed
     if len(normalized.split()) < 10:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Resume does not contain enough readable text")
 
-    return ParsedResume(text=normalized, filename=filename, file_size=len(data))
+    return ParsedResume(text=normalized, filename=filename, file_size=len(data), raw_bytes=data)
 
 
 async def parse_upload(file: UploadFile, settings: Settings) -> ParsedResume:
