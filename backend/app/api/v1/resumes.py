@@ -206,7 +206,14 @@ async def generate_resume_questions_stream(
         except Exception as exc:
             yield _sse_format({"type": "error", "data": {"message": str(exc)}})
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/guest/process/stream")
@@ -223,7 +230,14 @@ async def process_guest_resume_stream(
         except Exception as exc:
             yield _sse_format({"type": "error", "data": {"message": str(exc)}})
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

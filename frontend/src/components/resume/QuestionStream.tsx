@@ -28,17 +28,25 @@ export function QuestionStream({
   streamStateRef.current = streamState;
 
   // Auto-start streaming when mounted with onGenerate (no existing questions)
-  const startedRef = useRef(false);
   useEffect(() => {
-    if (existingQuestions.length > 0 || startedRef.current) return;
-    startedRef.current = true;
-    startStream();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // Skip if this is a history-browsing mount (already has questions)
+    if (existingQuestions.length > 0) return;
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => abortRef.current?.abort();
+    // Use a flag to handle React Strict Mode double-invoke:
+    //  1st invoke → started = false → startStream() → schedule
+    //  cleanup  → abortRef aborts, but we'll re-start on 2nd invoke
+    //  2nd invoke → starts a fresh stream that won't be aborted
+    let started = false;
+    const timer = setTimeout(() => {
+      started = true;
+      startStream();
+    }, 0);
+
+    return () => {
+      clearTimeout(timer);
+      if (!started) abortRef.current?.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function startStream() {

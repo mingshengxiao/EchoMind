@@ -36,7 +36,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 async function* readSSEStream(
   response: Response
 ): AsyncGenerator<SSEEvent> {
-  const reader = response.body!.getReader();
+  if (!response.body) {
+    throw new Error("Response body is not readable");
+  }
+  const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
 
