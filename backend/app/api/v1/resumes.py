@@ -11,7 +11,7 @@ from app.models.schemas import (
     ResumeUploadResponse,
 )
 from app.services.generator import generate_questions
-from app.services.parser import parse_upload
+from app.services.parser import parse_upload, detect_mime
 from app.services.security import get_current_user
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
@@ -48,8 +48,11 @@ async def upload_resume(
     parsed = await parse_upload(file, settings)
     resume = Resume(
         user_id=current_user.id,
+        original_filename=parsed.filename,
         filename=parsed.filename,
         file_size=parsed.file_size,
+        file_data=parsed.raw_bytes,
+        file_mime=detect_mime(parsed.filename),
         content_text=parsed.text,
         content_preview=parsed.preview,
         word_count=parsed.word_count,
