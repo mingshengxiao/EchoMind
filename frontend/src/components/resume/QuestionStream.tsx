@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { QuestionCard } from "@/components/resume/QuestionCard";
 import type { Question, SSEEvent } from "@/types";
 
@@ -24,20 +24,24 @@ export function QuestionStream({
   const [progress, setProgress] = useState({ generated: 0, total: 0 });
   const [error, setError] = useState("");
   const abortRef = useRef<AbortController | null>(null);
+  const streamStateRef = useRef(streamState);
+  streamStateRef.current = streamState;
 
-  // Sync when existing questions change (e.g., switching resumes)
+  // Auto-start streaming when mounted with onGenerate (no existing questions)
+  const startedRef = useRef(false);
   useEffect(() => {
-    if (streamState === "idle") {
-      setQuestions(existingQuestions);
-    }
-  }, [existingQuestions, streamState]);
+    if (existingQuestions.length > 0 || startedRef.current) return;
+    startedRef.current = true;
+    startStream();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => abortRef.current?.abort();
   }, []);
 
-  const startStream = useCallback(async () => {
+  async function startStream() {
     abortRef.current?.abort();
     const abortController = new AbortController();
     abortRef.current = abortController;
@@ -66,7 +70,7 @@ export function QuestionStream({
           setStreamState("error");
         }
       }
-      if (!abortController.signal.aborted && streamState !== "error") {
+      if (!abortController.signal.aborted && streamStateRef.current !== "error") {
         setStreamState("completed");
       }
     } catch (err) {
@@ -75,7 +79,7 @@ export function QuestionStream({
         setStreamState("error");
       }
     }
-  }, [onGenerate, onDone, streamState]);
+  }
 
   // Loading skeleton for existing questions
   if (isLoadingExisting) {
@@ -125,7 +129,7 @@ export function QuestionStream({
             <div className="text-center">
               <p className="text-lg font-semibold text-zinc-950">还没有面试题</p>
               <p className="mt-2 text-sm leading-6 text-zinc-600">
-                上传简历后，点击生成按钮即可开始
+                上传简历后即可开始
               </p>
             </div>
           </div>
