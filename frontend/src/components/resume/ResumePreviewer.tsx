@@ -2,42 +2,50 @@
 
 import { useEffect, useRef, useState } from "react";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
 interface ResumePreviewerProps {
-  fileUrl: string;
+  resumeId: string;
   filename: string;
   textFallback?: string;
 }
 
-export function ResumePreviewer({ fileUrl, filename, textFallback }: ResumePreviewerProps) {
+export function ResumePreviewer({ resumeId, filename, textFallback }: ResumePreviewerProps) {
   const [embedError, setEmbedError] = useState(false);
   const [zoom, setZoom] = useState(100);
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const fetchedRef = useRef(false);
 
   const isPdf = filename.toLowerCase().endsWith(".pdf");
 
-  // Fetch with auth header and create blob URL (embed can't set Authorization header)
+  // Fetch PDF with auth and create blob URL (embed can't set Authorization header)
   useEffect(() => {
     if (!isPdf || fetchedRef.current) return;
     fetchedRef.current = true;
 
-    fetch(fileUrl)
+    const token = typeof window !== "undefined"
+      ? window.localStorage.getItem("echomind-token")
+      : null;
+
+    fetch(`${API_BASE}/api/v1/resumes/${resumeId}/file`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch");
         return res.blob();
       })
       .then((blob) => {
-        setBlobUrl(URL.createObjectURL(blob));
+        setPdfUrl(URL.createObjectURL(blob));
       })
       .catch(() => {
         setEmbedError(true);
       });
 
     return () => {
-      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileUrl, isPdf]);
+  }, [resumeId, isPdf]);
 
   if (embedError || !isPdf) {
     return (
@@ -88,11 +96,11 @@ export function ResumePreviewer({ fileUrl, filename, textFallback }: ResumePrevi
         </div>
       </div>
 
-      {/* PDF embed */}
+      {/* PDF embed using blob URL */}
       <div className="flex-1 overflow-y-auto bg-zinc-100">
-        {blobUrl ? (
+        {pdfUrl ? (
           <embed
-            src={blobUrl}
+            src={pdfUrl}
             type="application/pdf"
             className="mx-auto block min-h-full w-full"
             style={{ width: `${zoom}%`, minWidth: "100%" }}
