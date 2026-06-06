@@ -13,6 +13,7 @@ from app.models.schemas import (
     ResumeListItem,
     ResumeUploadResponse,
 )
+from app.services.converter import docx_to_pdf, is_libreoffice_available
 from app.services.generator import generate_questions, generate_questions_stream
 from app.services.parser import parse_upload, detect_mime
 from app.services.security import get_current_user
@@ -243,6 +244,15 @@ async def get_resume_file(
 
     content_type = resume.file_mime or "application/octet-stream"
     filename = resume.original_filename or resume.filename
+
+    # On-demand DOCX → PDF conversion
+    if "wordprocessingml" in content_type and is_libreoffice_available():
+        try:
+            pdf_bytes = docx_to_pdf(resume.file_data)
+            resume.file_data = pdf_bytes
+            content_type = "application/pdf"
+        except (RuntimeError, OSError):
+            pass  # fall through to serve original DOCX
 
     return Response(
         content=resume.file_data,
