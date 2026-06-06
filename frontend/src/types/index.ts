@@ -42,3 +42,28 @@ export interface QuestionListResponse {
   total: number;
   source: "deepseek" | "mock";
 }
+
+// SSE stream event types
+export type SSEEventType = "question" | "progress" | "done" | "error";
+
+export interface SSEQuestionEvent {
+  type: "question";
+  data: Question;
+}
+
+export interface SSEProgressEvent {
+  type: "progress";
+  data: { generated: number; total: number };
+}
+
+export interface SSEDoneEvent {
+  type: "done";
+  data: { total: number; source: "deepseek" | "mock" };
+}
+
+export interface SSEErrorEvent {
+  type: "error";
+  data: { message: string };
+}
+
+export type SSEEvent = SSEQuestionEvent | SSEProgressEvent | SSEDoneEvent | SSEErrorEvent;
