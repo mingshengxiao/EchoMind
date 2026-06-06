@@ -29,7 +29,7 @@ export function ResumeHistory({ resumes, selectedResumeId, isDeleting, onSelect,
       {resumes.map((resume) => {
         const isActive = resume.id === selectedResumeId;
         return (
-          <button
+          <div
             aria-current={isActive ? "true" : undefined}
             className={`group relative w-full cursor-pointer rounded-2xl border p-3 pr-10 text-left transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
               isActive
@@ -38,7 +38,9 @@ export function ResumeHistory({ resumes, selectedResumeId, isDeleting, onSelect,
             }`}
             key={resume.id}
             onClick={() => onSelect(resume.id)}
-            type="button"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(resume.id); } }}
           >
             <div className="flex items-start gap-2">
               <FileText aria-hidden="true" className={`mt-0.5 h-4 w-4 ${isActive ? "text-brand" : "text-zinc-500"}`} />
@@ -59,7 +61,7 @@ export function ResumeHistory({ resumes, selectedResumeId, isDeleting, onSelect,
             >
               <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
             </button>
-          </button>
+          </div>
         );
       })}
     </div>
