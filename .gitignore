@@ -25,3 +25,6 @@ npm-debug.log*
 # AI
 .claude
 .venv
+
+# Brainstorming assets
+.superpowers/
