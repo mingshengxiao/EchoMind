@@ -22,9 +22,9 @@ export function FileUploader({ file, isBusy, onFileSelect, onSubmit }: FileUploa
 
   function acceptFile(nextFile: File) {
     const lowerName = nextFile.name.toLowerCase();
-    const isAllowed = allowedExtensions.some((extension) => lowerName.endsWith(extension));
+    const isAllowed = allowedExtensions.some((ext) => lowerName.endsWith(ext));
     if (!isAllowed) {
-      setError("仅支持 PDF、DOCX、MD、TXT 格式");
+      setError("仅支持 PDF/DOCX/MD/TXT");
       return;
     }
     if (nextFile.size > 10 * 1024 * 1024) {
@@ -36,60 +36,51 @@ export function FileUploader({ file, isBusy, onFileSelect, onSubmit }: FileUploa
   }
 
   return (
-    <section className="space-y-4" aria-labelledby="upload-title">
+    <div className="space-y-3">
       <div
         className={cn(
-          "rounded-3xl border-2 border-dashed border-zinc-300 bg-white/80 p-8 text-center transition-colors duration-200",
+          "rounded-2xl border-2 border-dashed border-zinc-300 bg-white/80 p-4 text-center transition-colors duration-200",
           isDragging && "border-brand bg-blue-50",
-          error && "border-red-300 bg-red-50",
+          error && "border-red-300 bg-red-50"
         )}
-        onDragEnter={(event) => {
-          event.preventDefault();
-          setIsDragging(true);
-        }}
-        onDragOver={(event) => event.preventDefault()}
+        onDragEnter={(e) => { e.preventDefault(); setIsDragging(true); }}
+        onDragOver={(e) => e.preventDefault()}
         onDragLeave={() => setIsDragging(false)}
-        onDrop={(event) => {
-          event.preventDefault();
+        onDrop={(e) => {
+          e.preventDefault();
           setIsDragging(false);
-          const droppedFile = event.dataTransfer.files[0];
-          if (droppedFile) acceptFile(droppedFile);
+          const f = e.dataTransfer.files[0];
+          if (f) acceptFile(f);
         }}
       >
-        <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-blue-100 text-brand">
-          <Upload aria-hidden="true" className="h-7 w-7" />
+        <div className="mx-auto mb-2 grid h-10 w-10 place-items-center rounded-xl bg-blue-100 text-brand">
+          <Upload aria-hidden="true" className="h-5 w-5" />
         </div>
-        <h2 id="upload-title" className="text-xl font-semibold text-zinc-950">
-          上传你的简历
-        </h2>
-        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-zinc-600">
-          拖放 PDF、DOCX、Markdown 或 TXT 简历到这里，或点击按钮选择文件。系统会生成 50–100 个基于简历内容的问题。
-        </p>
+        <p className="text-sm font-semibold text-zinc-950">上传简历</p>
+        <p className="mt-1 text-xs text-zinc-500">PDF/DOCX/MD/TXT</p>
         <input
           ref={inputRef}
           className="sr-only"
           type="file"
           accept=".pdf,.docx,.md,.markdown,.txt"
-          onChange={(event) => {
-            const selectedFile = event.target.files?.[0];
-            if (selectedFile) acceptFile(selectedFile);
-          }}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) acceptFile(f); }}
         />
-        <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Button onClick={() => inputRef.current?.click()} type="button" variant="secondary">
+        <div className="mt-3 flex flex-col gap-2">
+          <Button onClick={() => inputRef.current?.click()} type="button" variant="secondary" className="!w-full text-xs !py-2">
             选择文件
           </Button>
-          <Button disabled={!file || isBusy} onClick={onSubmit} type="button">
+          <Button disabled={!file || isBusy} onClick={onSubmit} type="button" className="!w-full text-xs !py-2">
             {isBusy ? "生成中..." : "生成面试题"}
           </Button>
         </div>
       </div>
-      {file ? (
-        <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700">
-          已选择：<span className="font-medium text-zinc-950">{file.name}</span> · {formatFileSize(file.size)}
+      {file && (
+        <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-700">
+          {file.name}<br />
+          <span className="text-zinc-400">{formatFileSize(file.size)}</span>
         </div>
-      ) : null}
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
-    </section>
+      )}
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
   );
 }

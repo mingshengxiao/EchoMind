@@ -1,3 +1,4 @@
+from bson import Binary
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from app.db.repository import AbstractRepository
@@ -42,16 +43,28 @@ class MongoRepository(AbstractRepository):
         return User(**document) if document else None
 
     async def create_resume(self, resume: Resume) -> Resume:
-        await self._database().resumes.insert_one(resume.model_dump(mode="json"))
+        doc = resume.model_dump()
+        if resume.file_data:
+            doc["file_data"] = Binary(resume.file_data)
+        await self._database().resumes.insert_one(doc)
         return resume
 
     async def get_resumes_by_user(self, user_id: str) -> list[Resume]:
         cursor = self._database().resumes.find({"user_id": user_id}).sort("uploaded_at", -1)
-        return [Resume(**document) async for document in cursor]
+        resumes = []
+        async for doc in cursor:
+            if isinstance(doc.get("file_data"), Binary):
+                doc["file_data"] = bytes(doc["file_data"])
+            resumes.append(Resume(**doc))
+        return resumes
 
     async def get_resume_by_id(self, resume_id: str) -> Resume | None:
-        document = await self._database().resumes.find_one({"id": resume_id})
-        return Resume(**document) if document else None
+        doc = await self._database().resumes.find_one({"id": resume_id})
+        if doc is None:
+            return None
+        if isinstance(doc.get("file_data"), Binary):
+            doc["file_data"] = bytes(doc["file_data"])
+        return Resume(**doc)
 
     async def delete_resume(self, resume_id: str) -> bool:
         result = await self._database().resumes.delete_one({"id": resume_id})

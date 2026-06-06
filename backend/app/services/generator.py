@@ -5,11 +5,24 @@ from langchain_core.messages import BaseMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
+import asyncio
+from typing import AsyncIterator
+
 from app.config import Settings
 from app.models.domain import GeneratedQuestion, GeneratedQuestionList, InterviewQuestion
 
 CATEGORIES = ["technical", "project", "experience", "behavioral", "scenario"]
 DIFFICULTIES = ["junior", "mid", "senior"]
+
+_SYSTEM_PROMPT_TEMPLATE = (
+    "你是一位资深技术面试官。请仅根据候选人的简历内容生成 {count} 个中文面试题。"
+    "题目需要覆盖技术能力、项目经历、行为面试、场景题和经验深挖。"
+    "每个问题必须同时给出 reference_answer 参考回答。参考回答要基于简历内容，使用 3 到 6 句中文说明可参考的回答思路，不要编造简历中不存在的经历。"
+    "不要编造简历中不存在的经历。"
+    "必须只返回合法 JSON，不要返回 Markdown，不要返回解释文字。"
+    "JSON 格式必须是："
+    '{{"questions":[{{"question_text":"问题文本","category":"technical|behavioral|project|experience|scenario","difficulty":"junior|mid|senior","focus_area":"考察点","reference_answer":"参考回答"}}]}}。'
+)
 
 
 class QuestionGenerationResult:
@@ -123,21 +136,10 @@ async def generate_questions(resume_text: str, settings: Settings, count: int = 
             "thinking": {"type": "disabled"},
         },
     )
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                "你是一位资深技术面试官。请仅根据候选人的简历内容生成 {count} 个中文面试题。"
-                "题目需要覆盖技术能力、项目经历、行为面试、场景题和经验深挖。"
-                "每个问题必须同时给出 reference_answer 参考回答。参考回答要基于简历内容，使用 3 到 6 句中文说明可参考的回答思路，不要编造简历中不存在的经历。"
-                "不要编造简历中不存在的经历。"
-                "必须只返回合法 JSON，不要返回 Markdown，不要返回解释文字。"
-                "JSON 格式必须是："
-                '{{"questions":[{{"question_text":"问题文本","category":"technical|behavioral|project|experience|scenario","difficulty":"junior|mid|senior","focus_area":"考察点","reference_answer":"参考回答"}}]}}。',
-            ),
-            ("human", "--- 简历内容 ---\n{resume_text}"),
-        ]
-    )
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", _SYSTEM_PROMPT_TEMPLATE),
+        ("human", "--- 简历内容 ---\n{resume_text}"),
+    ])
     messages = await prompt.ainvoke({"resume_text": resume_text[:24000], "count": target_count})
     response = await llm.ainvoke(
         messages,
@@ -169,3 +171,81 @@ async def generate_questions(resume_text: str, settings: Settings, count: int = 
             for item in generated
         ]
     return QuestionGenerationResult(questions, "deepseek")
+
+
+async def generate_questions_stream(
+    resume_text: str, settings: Settings, count: int = 75
+) -> AsyncIterator[dict]:
+    """Async generator yielding SSE-compatible event dicts.
+
+    Yields:
+      {"type": "question", "data": {...}}
+      {"type": "progress", "data": {"generated": N, "total": T}}
+      {"type": "done", "data": {"total": N, "source": "deepseek|mock"}}
+      {"type": "error", "data": {"message": "..."}}
+    """
+    target_count = _normalize_count(count)
+
+    if not settings.deepseek_api_key:
+        questions = _mock_questions(resume_text, target_count)
+        for i, q in enumerate(questions):
+            yield {
+                "type": "question",
+                "data": {
+                    "question_text": q.question_text,
+                    "category": q.category,
+                    "difficulty": q.difficulty,
+                    "focus_area": q.focus_area,
+                    "reference_answer": q.reference_answer,
+                },
+            }
+            if (i + 1) % 5 == 0 or i == len(questions) - 1:
+                yield {"type": "progress", "data": {"generated": i + 1, "total": len(questions)}}
+            await asyncio.sleep(0.25)
+        yield {"type": "done", "data": {"total": len(questions), "source": "mock"}}
+        return
+
+    # LLM mode
+    llm = ChatOpenAI(
+        model=settings.deepseek_model,
+        base_url=settings.deepseek_base_url,
+        api_key=settings.deepseek_api_key,
+        temperature=0.45,
+        max_tokens=8192,
+        extra_body={"thinking": {"type": "disabled"}},
+    )
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", _SYSTEM_PROMPT_TEMPLATE),
+        ("human", "--- 简历内容 ---\n{resume_text}"),
+    ])
+
+    try:
+        messages = await prompt.ainvoke({"resume_text": resume_text[:24000], "count": target_count})
+        response = await llm.ainvoke(messages, response_format={"type": "json_object"})
+        generated = _parse_generated_questions(_message_content_text(response))[:100]
+    except Exception as exc:
+        yield {"type": "error", "data": {"message": f"AI generation failed: {exc}"}}
+        return
+
+    if len(generated) < 50:
+        fallback = _mock_questions(resume_text, 50 - len(generated))
+        questions = list(generated) + fallback
+    else:
+        questions = list(generated)
+
+    for i, q in enumerate(questions):
+        yield {
+            "type": "question",
+            "data": {
+                "question_text": q.question_text,
+                "category": q.category,
+                "difficulty": q.difficulty,
+                "focus_area": q.focus_area,
+                "reference_answer": q.reference_answer,
+            },
+        }
+        if (i + 1) % 5 == 0 or i == len(questions) - 1:
+            yield {"type": "progress", "data": {"generated": i + 1, "total": len(questions)}}
+        await asyncio.sleep(0.25)
+
+    yield {"type": "done", "data": {"total": len(questions), "source": "deepseek"}}

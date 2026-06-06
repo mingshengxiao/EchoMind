@@ -1,4 +1,7 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
+from fastapi.responses import Response, StreamingResponse
 
 from app.config import Settings, get_settings
 from app.db.repository import AbstractRepository
@@ -10,8 +13,9 @@ from app.models.schemas import (
     ResumeListItem,
     ResumeUploadResponse,
 )
-from app.services.generator import generate_questions
-from app.services.parser import parse_upload
+from app.services.converter import docx_to_pdf, is_libreoffice_available
+from app.services.generator import generate_questions, generate_questions_stream
+from app.services.parser import parse_upload, detect_mime
 from app.services.security import get_current_user
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
@@ -48,8 +52,11 @@ async def upload_resume(
     parsed = await parse_upload(file, settings)
     resume = Resume(
         user_id=current_user.id,
+        original_filename=parsed.filename,
         filename=parsed.filename,
         file_size=parsed.file_size,
+        file_data=parsed.raw_bytes,
+        file_mime=detect_mime(parsed.filename),
         content_text=parsed.text,
         content_preview=parsed.preview,
         word_count=parsed.word_count,
@@ -148,4 +155,131 @@ async def process_guest_resume(file: UploadFile, settings: Settings = Depends(ge
         questions=[to_question_response(question) for question in result.questions],
         total=len(result.questions),
         source=result.source,
+    )
+
+
+# ---------------------------------------------------------------------------
+# SSE streaming
+# ---------------------------------------------------------------------------
+
+def _sse_format(event_dict: dict) -> str:
+    """Format a dict as SSE event string. event_dict = {"type": str, "data": ...}"""
+    event_type = event_dict["type"]
+    data = json.dumps(event_dict["data"], ensure_ascii=False)
+    return f"event: {event_type}\ndata: {data}\n\n"
+
+
+@router.post("/{resume_id}/questions/generate/stream")
+async def generate_resume_questions_stream(
+    request: Request,
+    resume_id: str,
+    current_user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+):
+    repository: AbstractRepository = request.app.state.repository
+    resume = await _ensure_owner(repository, resume_id, current_user)
+
+    async def event_stream():
+        collected: list[InterviewQuestion] = []
+        try:
+            async for event in generate_questions_stream(resume.content_text, settings):
+                if event["type"] == "question":
+                    collected.append(
+                        InterviewQuestion(
+                            question_text=event["data"]["question_text"],
+                            category=event["data"]["category"],
+                            difficulty=event["data"]["difficulty"],
+                            focus_area=event["data"]["focus_area"],
+                            reference_answer=event["data"].get("reference_answer", ""),
+                            resume_id=resume.id,
+                        )
+                    )
+                    yield _sse_format(event)
+                elif event["type"] == "done":
+                    await repository.save_questions(resume.id, collected)
+                    yield _sse_format(event)
+                elif event["type"] == "error":
+                    yield _sse_format(event)
+                    return
+                else:
+                    yield _sse_format(event)
+        except Exception as exc:
+            yield _sse_format({"type": "error", "data": {"message": str(exc)}})
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.post("/guest/process/stream")
+async def process_guest_resume_stream(
+    file: UploadFile,
+    settings: Settings = Depends(get_settings),
+):
+    parsed = await parse_upload(file, settings)
+
+    async def event_stream():
+        try:
+            async for event in generate_questions_stream(parsed.text, settings):
+                yield _sse_format(event)
+        except Exception as exc:
+            yield _sse_format({"type": "error", "data": {"message": str(exc)}})
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+# ---------------------------------------------------------------------------
+# File download / preview
+# ---------------------------------------------------------------------------
+
+@router.get("/{resume_id}/file")
+async def get_resume_file(
+    request: Request,
+    resume_id: str,
+    settings: Settings = Depends(get_settings),
+    token: str | None = None,
+):
+    repository: AbstractRepository = request.app.state.repository
+
+    # Resolve user: Authorization header first, then ?token= query param (for <embed>)
+    auth_header = request.headers.get("Authorization")
+    token_str: str | None = None
+    if auth_header and auth_header.startswith("Bearer "):
+        token_str = auth_header[7:]
+    elif token:
+        token_str = token
+
+    if not token_str:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    try:
+        from jose import JWTError, jwt
+        payload = jwt.decode(token_str, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        user_id = payload.get("sub")
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    resume = await repository.get_resume_by_id(resume_id)
+    if resume is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found")
+    if resume.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+
+    if not resume.file_data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not available")
+
+    content_type = resume.file_mime or "application/octet-stream"
+    filename = resume.original_filename or resume.filename
+
+    # On-demand DOCX → PDF conversion
+    if "wordprocessingml" in content_type and is_libreoffice_available():
+        try:
+            pdf_bytes = docx_to_pdf(resume.file_data)
+            resume.file_data = pdf_bytes
+            content_type = "application/pdf"
+        except (RuntimeError, OSError):
+            pass  # fall through to serve original DOCX
+
+    return Response(
+        content=resume.file_data,
+        media_type=content_type,
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
     )

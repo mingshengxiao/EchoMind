@@ -1,4 +1,4 @@
-import type { AuthResponse, QuestionListResponse, ResumeListItem, ResumeUploadResponse, User } from "@/types";
+import type { AuthResponse, QuestionListResponse, ResumeListItem, ResumeUploadResponse, SSEEvent, User } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -33,6 +33,38 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return parseResponse<T>(response);
 }
 
+async function* readSSEStream(
+  response: Response
+): AsyncGenerator<SSEEvent> {
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const blocks = buffer.split("\n\n");
+    buffer = blocks.pop() || "";
+
+    for (const block of blocks) {
+      if (!block.trim()) continue;
+      const lines = block.split("\n");
+      let eventType = "";
+      let dataStr = "";
+      for (const line of lines) {
+        if (line.startsWith("event: ")) eventType = line.slice(7);
+        if (line.startsWith("data: ")) dataStr = line.slice(6);
+      }
+      if (eventType && dataStr) {
+        const data = JSON.parse(dataStr);
+        yield { type: eventType, data } as SSEEvent;
+      }
+    }
+  }
+}
+
 export const api = {
   register: (payload: { username: string; password: string; email?: string }) =>
     request<AuthResponse>("/api/v1/auth/register", { method: "POST", body: JSON.stringify(payload) }),
@@ -53,5 +85,43 @@ export const api = {
     const formData = new FormData();
     formData.append("file", file);
     return request<QuestionListResponse>("/api/v1/resumes/guest/process", { method: "POST", body: formData });
+  },
+
+  // SSE streaming
+  streamGenerateQuestions: async function* (
+    resumeId: string,
+    signal?: AbortSignal
+  ): AsyncGenerator<SSEEvent> {
+    const headers = new Headers();
+    const currentToken = token();
+    if (currentToken) headers.set("Authorization", `Bearer ${currentToken}`);
+    const response = await fetch(`${API_BASE}/api/v1/resumes/${resumeId}/questions/generate/stream`, {
+      method: "POST",
+      headers,
+      signal,
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: "网络请求失败" }));
+      throw new ApiError(response.status, err.detail || "请求失败");
+    }
+    yield* readSSEStream(response);
+  },
+
+  streamProcessGuestResume: async function* (
+    file: File,
+    signal?: AbortSignal
+  ): AsyncGenerator<SSEEvent> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await fetch(`${API_BASE}/api/v1/resumes/guest/process/stream`, {
+      method: "POST",
+      body: formData,
+      signal,
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: "网络请求失败" }));
+      throw new ApiError(response.status, err.detail || "请求失败");
+    }
+    yield* readSSEStream(response);
   },
 };
