@@ -95,7 +95,9 @@ export const api = {
     resumeId: string,
     signal?: AbortSignal
   ): AsyncGenerator<SSEEvent> {
-    const headers = new Headers();
+    const headers = new Headers({
+      "Accept": "text/event-stream",
+    });
     const currentToken = token();
     if (currentToken) headers.set("Authorization", `Bearer ${currentToken}`);
     const response = await fetch(`${API_BASE}/api/v1/resumes/${resumeId}/questions/generate/stream`, {
@@ -117,6 +119,7 @@ export const api = {
     const formData = new FormData();
     formData.append("file", file);
     const response = await fetch(`${API_BASE}/api/v1/resumes/guest/process/stream`, {
+      headers: { "Accept": "text/event-stream" },
       method: "POST",
       body: formData,
       signal,
