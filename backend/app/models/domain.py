@@ -28,8 +28,11 @@ class User(BaseModel):
 class Resume(BaseModel):
     id: str = Field(default_factory=new_id)
     user_id: str
+    original_filename: str = ""
     filename: str
     file_size: int
+    file_data: bytes = b""
+    file_mime: str = ""
     content_text: str
     content_preview: str
     word_count: int
