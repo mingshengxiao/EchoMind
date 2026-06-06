@@ -234,10 +234,34 @@ async def process_guest_resume_stream(
 async def get_resume_file(
     request: Request,
     resume_id: str,
-    current_user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    token: str | None = None,
 ):
     repository: AbstractRepository = request.app.state.repository
-    resume = await _ensure_owner(repository, resume_id, current_user)
+
+    # Resolve user: Authorization header first, then ?token= query param (for <embed>)
+    auth_header = request.headers.get("Authorization")
+    token_str: str | None = None
+    if auth_header and auth_header.startswith("Bearer "):
+        token_str = auth_header[7:]
+    elif token:
+        token_str = token
+
+    if not token_str:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    try:
+        from jose import JWTError, jwt
+        payload = jwt.decode(token_str, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        user_id = payload.get("sub")
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    resume = await repository.get_resume_by_id(resume_id)
+    if resume is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found")
+    if resume.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
     if not resume.file_data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not available")
