@@ -69,6 +69,59 @@ class QuestionListResponse(BaseModel):
     source: Literal["deepseek", "mock"] = "mock"
 
 
+class QuestionBankTopicResponse(BaseModel):
+    id: str
+    name: str
+    question_count: int
+
+
+class QuestionBankItemResponse(BaseModel):
+    id: str
+    topic: str
+    question_text: str
+    reference_answer: str
+    difficulty: str
+    tags: list[str]
+    source_file: str
+    created_at: datetime
+
+
+class UserProgressResponse(BaseModel):
+    is_bookmarked: bool
+    is_mastered: bool
+    is_review: bool
+    user_answer: str
+    answered_at: datetime | None = None
+
+
+class QuestionBankDetailResponse(QuestionBankItemResponse):
+    user_progress: UserProgressResponse | None = None
+
+
+class QuestionBankListResponse(BaseModel):
+    items: list[QuestionBankDetailResponse]
+    total: int
+    page: int
+    size: int
+
+
+class ProgressStatsResponse(BaseModel):
+    bookmarked: int = 0
+    mastered: int = 0
+    review: int = 0
+    answered: int = 0
+    total: int = 0
+
+
+class ToggleActionResponse(BaseModel):
+    success: bool = True
+    new_value: bool
+
+
+class SaveAnswerRequest(BaseModel):
+    answer: str
+
+
 class HealthResponse(BaseModel):
     status: str
     repository: str

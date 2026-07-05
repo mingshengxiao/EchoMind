@@ -50,6 +50,36 @@ class InterviewQuestion(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
 
 
+class QuestionBankTopic(BaseModel):
+    id: str = Field(default_factory=new_id)
+    name: str
+    question_count: int = 0
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class QuestionBankItem(BaseModel):
+    id: str = Field(default_factory=new_id)
+    topic: str
+    question_text: str
+    reference_answer: str = ""
+    difficulty: QuestionDifficulty = "mid"
+    tags: list[str] = []
+    source_file: str = ""
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class UserQuestionProgress(BaseModel):
+    id: str = Field(default_factory=new_id)
+    user_id: str
+    question_id: str
+    is_bookmarked: bool = False
+    is_mastered: bool = False
+    is_review: bool = False
+    user_answer: str = ""
+    answered_at: datetime | None = None
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class GeneratedQuestion(BaseModel):
     question_text: str = Field(description="The full interview question text")
     category: QuestionCategory = Field(description="technical | behavioral | project | experience | scenario")
