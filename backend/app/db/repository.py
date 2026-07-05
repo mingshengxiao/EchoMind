@@ -1,6 +1,13 @@
 from abc import ABC, abstractmethod
 
-from app.models.domain import InterviewQuestion, Resume, User
+from app.models.domain import (
+    InterviewQuestion,
+    QuestionBankItem,
+    QuestionBankTopic,
+    Resume,
+    User,
+    UserQuestionProgress,
+)
 
 
 class AbstractRepository(ABC):
@@ -46,4 +53,55 @@ class AbstractRepository(ABC):
 
     @abstractmethod
     async def get_questions_by_resume(self, resume_id: str) -> list[InterviewQuestion]:
+        raise NotImplementedError
+
+    # ── Question Bank ──────────────────────────────────────────
+
+    @abstractmethod
+    async def get_question_bank_topics(self) -> list[QuestionBankTopic]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def save_question_bank_topics(self, topics: list[QuestionBankTopic]) -> list[QuestionBankTopic]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_or_create_topic(self, name: str) -> QuestionBankTopic:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def save_question_bank_items(self, items: list[QuestionBankItem]) -> list[QuestionBankItem]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_question_bank_items(
+        self,
+        topic: str | None = None,
+        difficulty: str | None = None,
+        search: str | None = None,
+        page: int = 1,
+        size: int = 20,
+    ) -> tuple[list[QuestionBankItem], int]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_question_bank_item_by_id(self, item_id: str) -> QuestionBankItem | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_user_progress(self, user_id: str, question_id: str) -> UserQuestionProgress | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def upsert_user_progress(self, progress: UserQuestionProgress) -> UserQuestionProgress:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_user_progress_stats(self, user_id: str) -> dict:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_user_progress_batch(
+        self, user_id: str, question_ids: list[str]
+    ) -> dict[str, UserQuestionProgress]:
         raise NotImplementedError
