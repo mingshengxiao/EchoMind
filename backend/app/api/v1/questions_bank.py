@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
-from app.config import Settings, get_settings
 from app.db.repository import AbstractRepository
 from app.models.domain import QuestionBankItem, User, UserQuestionProgress, utc_now
 from app.models.schemas import (
