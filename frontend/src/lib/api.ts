@@ -1,4 +1,15 @@
-import type { AuthResponse, QuestionListResponse, ResumeListItem, ResumeUploadResponse, SSEEvent, User } from "@/types";
+import type {
+  AuthResponse,
+  ProgressStats,
+  QuestionBankDetail,
+  QuestionBankListResponse,
+  QuestionBankTopic,
+  QuestionListResponse,
+  ResumeListItem,
+  ResumeUploadResponse,
+  SSEEvent,
+  User,
+} from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -129,5 +140,59 @@ export const api = {
       throw new ApiError(response.status, err.detail || "请求失败");
     }
     yield* readSSEStream(response);
+  },
+
+  questionsBank: {
+    listTopics: () =>
+      request<QuestionBankTopic[]>("/api/v1/questions-bank/topics"),
+
+    listQuestions: (params?: {
+      topic?: string;
+      difficulty?: string;
+      search?: string;
+      page?: number;
+      size?: number;
+    }) => {
+      const query = new URLSearchParams();
+      if (params?.topic) query.set("topic", params.topic);
+      if (params?.difficulty) query.set("difficulty", params.difficulty);
+      if (params?.search) query.set("search", params.search);
+      if (params?.page) query.set("page", String(params.page));
+      if (params?.size) query.set("size", String(params.size));
+      const qs = query.toString();
+      return request<QuestionBankListResponse>(
+        `/api/v1/questions-bank/questions${qs ? `?${qs}` : ""}`
+      );
+    },
+
+    getQuestion: (id: string) =>
+      request<QuestionBankDetail>(`/api/v1/questions-bank/questions/${id}`),
+
+    toggleBookmark: (id: string) =>
+      request<{ success: boolean; new_value: boolean }>(
+        `/api/v1/questions-bank/questions/${id}/bookmark`,
+        { method: "POST" }
+      ),
+
+    toggleMastered: (id: string) =>
+      request<{ success: boolean; new_value: boolean }>(
+        `/api/v1/questions-bank/questions/${id}/master`,
+        { method: "POST" }
+      ),
+
+    toggleReview: (id: string) =>
+      request<{ success: boolean; new_value: boolean }>(
+        `/api/v1/questions-bank/questions/${id}/review`,
+        { method: "POST" }
+      ),
+
+    saveAnswer: (id: string, answer: string) =>
+      request<{ success: boolean; new_value: boolean }>(
+        `/api/v1/questions-bank/questions/${id}/answer`,
+        { method: "POST", body: JSON.stringify({ answer }) }
+      ),
+
+    getProgress: () =>
+      request<ProgressStats>("/api/v1/questions-bank/progress"),
   },
 };

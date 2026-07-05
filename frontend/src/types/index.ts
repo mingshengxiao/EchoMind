@@ -43,6 +43,52 @@ export interface QuestionListResponse {
   source: "deepseek" | "mock";
 }
 
+// ── Questions Bank ──────────────────────────────────────────
+
+export interface QuestionBankTopic {
+  id: string;
+  name: string;
+  question_count: number;
+}
+
+export interface QuestionBankItem {
+  id: string;
+  topic: string;
+  question_text: string;
+  reference_answer: string;
+  difficulty: string;
+  tags: string[];
+  source_file: string;
+  created_at: string;
+}
+
+export interface UserProgressState {
+  is_bookmarked: boolean;
+  is_mastered: boolean;
+  is_review: boolean;
+  user_answer: string;
+  answered_at: string | null;
+}
+
+export interface QuestionBankDetail extends QuestionBankItem {
+  user_progress?: UserProgressState;
+}
+
+export interface QuestionBankListResponse {
+  items: QuestionBankDetail[];
+  total: number;
+  page: number;
+  size: number;
+}
+
+export interface ProgressStats {
+  bookmarked: number;
+  mastered: number;
+  review: number;
+  answered: number;
+  total: number;
+}
+
 // SSE stream event types
 export type SSEEventType = "question" | "progress" | "done" | "error";
 
