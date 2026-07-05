@@ -11,7 +11,7 @@ export default function HomePage() {
         <div>
           <div className="mb-6 inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700">
             <Sparkles aria-hidden="true" className="mr-2 h-4 w-4" />
-            简历问答 · 第一阶段已开放
+            面试题集 · 新功能已上线
           </div>
           <h1 className="max-w-4xl text-4xl font-black tracking-tight text-zinc-950 sm:text-6xl">
             把你的简历变成一份可追问的面试训练清单。
@@ -28,6 +28,12 @@ export default function HomePage() {
             </Link>
             <Link href="/login">
               <Button variant="secondary">登录并保存历史</Button>
+            </Link>
+            <Link href="/questions-bank">
+              <Button variant="secondary">
+                去刷题
+                <ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" />
+              </Button>
             </Link>
           </div>
         </div>

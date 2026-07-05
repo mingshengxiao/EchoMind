@@ -21,6 +21,9 @@ export function SiteHeader() {
           <Link className="transition-colors duration-200 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand" href="/resume-qa">
             简历问答
           </Link>
+          <Link className="transition-colors duration-200 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand" href="/questions-bank">
+            面试题集
+          </Link>
           <Link className="transition-colors duration-200 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand" href="/#features">
             功能亮点
           </Link>
