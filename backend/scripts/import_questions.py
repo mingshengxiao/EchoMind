@@ -51,7 +51,7 @@ def parse_format_a(text: str, source_file: str) -> list[tuple[str, str]]:
                 results.append((current_question, answer))
             current_question = m.group(1)
             current_answer_parts = []
-        elif stripped.startswith("-") or stripped.startswith(" -") or stripped.startswith("—"):
+        elif stripped.startswith("-") or stripped.startswith("—"):
             # Answer bullet lines
             current_answer_parts.append(stripped.lstrip("-— ").strip())
         elif current_question and stripped and not stripped.startswith("```"):
@@ -112,11 +112,6 @@ def parse_file(filepath: str) -> list[tuple[str, str]]:
     results = parse_format_a(text, filepath)
     if not results:
         results = parse_format_b(text, filepath)
-    # Fallback: try format B first then A
-    if not results:
-        results = parse_format_b(text, filepath)
-    if not results:
-        results = parse_format_a(text, filepath)
 
     return results
 
@@ -130,6 +125,11 @@ async def import_questions(dir_path: str, ai_enrich: bool = False):
     # Remove old data for a fresh import
     await db.question_bank_topics.delete_many({})
     await db.question_bank_items.delete_many({})
+
+    if not os.path.isdir(dir_path):
+        print(f"Error: directory not found: {dir_path}")
+        client.close()
+        return
 
     md_files = sorted([f for f in os.listdir(dir_path) if f.endswith(".md") and f != "README.md"])
     all_items: list[QuestionBankItem] = []
@@ -180,7 +180,7 @@ async def import_questions(dir_path: str, ai_enrich: bool = False):
 
 def main():
     parser = argparse.ArgumentParser(description="Import interview questions from markdown files")
-    parser.add_argument("--dir", default=DIR_HELP)
+    parser.add_argument("--dir", required=True, help=DIR_HELP)
     parser.add_argument("--ai-enrich", action="store_true", help="Use AI to fill difficulty/tags")
     args = parser.parse_args()
 
