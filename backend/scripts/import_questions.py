@@ -72,31 +72,78 @@ def parse_format_b(text: str, source_file: str) -> list[tuple[str, str]]:
 
     ### N. 问题标题？
     ✅ 答案内容
+
+    or:
+
+    ## 问题 N：标题
+    ### 答案
+    内容
     """
     results: list[tuple[str, str]] = []
 
-    # Pattern 1: ### N. 问题标题
-    # followed by content until next ###
     blocks = re.split(r"(?=^#{2,3}\s+)", text, flags=re.MULTILINE)
-    for block in blocks:
-        if not block.strip():
-            continue
-        # Try to extract question from heading
-        q_match = re.match(r"^#{2,3}\s+(?:\d+[.、．]\s*)?(.+)$", block.strip(), re.MULTILINE)
-        if not q_match:
-            continue
-        question = q_match.group(1).strip()
-        if not question:
+
+    i = 0
+    while i < len(blocks):
+        block = blocks[i].strip()
+        if not block:
+            i += 1
             continue
 
-        # Remove the heading line(s) to get answer body
-        body = re.sub(r"^#{2,3}\s+.*$", "", block, flags=re.MULTILINE).strip()
-        # Remove ✅ emoji prefix
-        body = re.sub(r"^[✅✔]\s*", "", body.strip())
-        # Remove code fences
-        body = re.sub(r"```[\s\S]*?```", "", body).strip()
-        if body:
-            results.append((question, body))
+        # Try to extract question from heading
+        q_match = re.match(r"^#{2,3}\s+(?:\d+[.、．]\s*)?(.+)$", block, re.MULTILINE)
+        if not q_match:
+            i += 1
+            continue
+
+        question = q_match.group(1).strip()
+        if not question:
+            i += 1
+            continue
+
+        # Skip non-question headings (答案, answer, etc.)
+        if re.match(r"^(答案|answer|回答|解答|答|Answer)$", question, re.IGNORECASE):
+            i += 1
+            continue
+
+        # 1) Try to extract answer from the current block (after heading line(s))
+        answer = re.sub(r"^#{2,3}\s+.*$", "", block, flags=re.MULTILINE).strip()
+
+        i += 1
+
+        # 2) If empty, look at subsequent blocks until the next question heading
+        if not answer:
+            while i < len(blocks):
+                next_block = blocks[i].strip()
+                if not next_block:
+                    i += 1
+                    continue
+                next_q = re.match(
+                    r"^#{2,3}\s+(?:\d+[.、．]\s*)?(.+)$", next_block, re.MULTILINE
+                )
+                if next_q:
+                    next_q_text = next_q.group(1).strip()
+                    # "### 答案" marker — take its body as the answer and continue
+                    if re.match(r"^(答案|answer|回答|解答|答|Answer)$", next_q_text, re.IGNORECASE):
+                        body = re.sub(r"^#{2,3}\s+.*$", "", next_block, flags=re.MULTILINE).strip()
+                        if body:
+                            answer = body
+                        i += 1
+                        continue
+                    # Real question heading — stop
+                    break
+                if answer:
+                    answer = "\n".join([answer, next_block]).strip()
+                else:
+                    answer = next_block
+                i += 1
+
+        # Clean up
+        answer = re.sub(r"^[✅✔]\s*", "", answer.strip())
+        answer = re.sub(r"```[\s\S]*?```", "", answer).strip()
+
+        if answer:
+            results.append((question, answer))
 
     return results
 
