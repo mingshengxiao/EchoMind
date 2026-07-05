@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import auth, resumes
+from app.api.v1.questions_bank import router as questions_bank_router
 from app.config import get_settings
 from app.db.factory import create_repository
 from app.models.schemas import HealthResponse
@@ -31,6 +32,7 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix=settings.api_prefix)
 app.include_router(resumes.router, prefix=settings.api_prefix)
+app.include_router(questions_bank_router, prefix=settings.api_prefix)
 
 
 @app.get("/health", response_model=HealthResponse)

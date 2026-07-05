@@ -53,3 +53,24 @@ async def get_current_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return user
+
+
+async def get_optional_user(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> User | None:
+    """Like get_current_user but returns None instead of 401 when no token."""
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return None
+    token_str = auth_header[7:]
+    try:
+        payload = jwt.decode(token_str, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        user_id = payload.get("sub")
+        if user_id is None:
+            return None
+        repository: AbstractRepository = request.app.state.repository
+        user = await repository.get_user_by_id(user_id)
+        return user
+    except JWTError:
+        return None
