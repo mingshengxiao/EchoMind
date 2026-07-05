@@ -2,7 +2,15 @@ from bson import Binary
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from app.db.repository import AbstractRepository
-from app.models.domain import InterviewQuestion, Resume, User
+from app.models.domain import (
+    InterviewQuestion,
+    QuestionBankItem,
+    QuestionBankTopic,
+    Resume,
+    User,
+    UserQuestionProgress,
+)
+from app.models.domain import utc_now
 
 
 class MongoRepository(AbstractRepository):
@@ -20,6 +28,13 @@ class MongoRepository(AbstractRepository):
         await self.db.users.create_index("username", unique=True)
         await self.db.resumes.create_index("user_id")
         await self.db.questions.create_index("resume_id")
+        await self.db.question_bank_topics.create_index("name", unique=True)
+        await self.db.question_bank_items.create_index("topic")
+        await self.db.question_bank_items.create_index("difficulty")
+        await self.db.question_bank_items.create_index([("topic", 1), ("created_at", -1)])
+        await self.db.question_bank_items.create_index([("question_text", "text"), ("reference_answer", "text")])
+        await self.db.user_question_progress.create_index("user_id")
+        await self.db.user_question_progress.create_index([("user_id", 1), ("question_id", 1)], unique=True)
 
     async def close(self) -> None:
         if self.client is not None:
@@ -80,3 +95,117 @@ class MongoRepository(AbstractRepository):
     async def get_questions_by_resume(self, resume_id: str) -> list[InterviewQuestion]:
         cursor = self._database().questions.find({"resume_id": resume_id}).sort("created_at", 1)
         return [InterviewQuestion(**document) async for document in cursor]
+
+    # ── Question Bank ──────────────────────────────────────────
+
+    async def get_question_bank_topics(self) -> list[QuestionBankTopic]:
+        cursor = self._database().question_bank_topics.find().sort("name", 1)
+        return [QuestionBankTopic(**doc) async for doc in cursor]
+
+    async def save_question_bank_topics(self, topics: list[QuestionBankTopic]) -> list[QuestionBankTopic]:
+        if not topics:
+            return topics
+        for topic in topics:
+            await self._database().question_bank_topics.update_one(
+                {"name": topic.name}, {"$set": topic.model_dump(mode="json")}, upsert=True
+            )
+        return topics
+
+    async def get_or_create_topic(self, name: str) -> QuestionBankTopic:
+        doc = await self._database().question_bank_topics.find_one({"name": name})
+        if doc:
+            return QuestionBankTopic(**doc)
+        topic = QuestionBankTopic(name=name)
+        await self._database().question_bank_topics.insert_one(topic.model_dump(mode="json"))
+        return topic
+
+    async def save_question_bank_items(self, items: list[QuestionBankItem]) -> list[QuestionBankItem]:
+        if not items:
+            return items
+        dicts = [item.model_dump(mode="json") for item in items]
+        await self._database().question_bank_items.insert_many(dicts)
+        return items
+
+    async def get_question_bank_items(
+        self,
+        topic: str | None = None,
+        difficulty: str | None = None,
+        search: str | None = None,
+        page: int = 1,
+        size: int = 20,
+    ) -> tuple[list[QuestionBankItem], int]:
+        db = self._database()
+        query: dict = {}
+
+        if topic:
+            query["topic"] = topic
+        if difficulty:
+            query["difficulty"] = difficulty
+        if search:
+            query["$text"] = {"$search": search}
+
+        cursor = db.question_bank_items.find(query).sort("created_at", -1)
+        total = await db.question_bank_items.count_documents(query)
+        skip = (page - 1) * size
+        cursor = cursor.skip(skip).limit(size)
+        items = [QuestionBankItem(**doc) async for doc in cursor]
+        return items, total
+
+    async def get_question_bank_item_by_id(self, item_id: str) -> QuestionBankItem | None:
+        doc = await self._database().question_bank_items.find_one({"id": item_id})
+        return QuestionBankItem(**doc) if doc else None
+
+    async def get_user_progress(self, user_id: str, question_id: str) -> UserQuestionProgress | None:
+        doc = await self._database().user_question_progress.find_one(
+            {"user_id": user_id, "question_id": question_id}
+        )
+        return UserQuestionProgress(**doc) if doc else None
+
+    async def upsert_user_progress(self, progress: UserQuestionProgress) -> UserQuestionProgress:
+        progress.updated_at = utc_now()
+        await self._database().user_question_progress.update_one(
+            {"user_id": progress.user_id, "question_id": progress.question_id},
+            {"$set": progress.model_dump(mode="json")},
+            upsert=True,
+        )
+        return progress
+
+    async def get_user_progress_stats(self, user_id: str) -> dict:
+        db = self._database()
+        pipeline = [
+            {"$match": {"user_id": user_id}},
+            {
+                "$group": {
+                    "_id": None,
+                    "bookmarked": {"$sum": {"$cond": ["$is_bookmarked", 1, 0]}},
+                    "mastered": {"$sum": {"$cond": ["$is_mastered", 1, 0]}},
+                    "review": {"$sum": {"$cond": ["$is_review", 1, 0]}},
+                    "answered": {"$sum": {"$cond": [{"$ifNull": ["$answered_at", None]}, 1, 0]}},
+                    "total": {"$sum": 1},
+                }
+            },
+        ]
+        cursor = db.user_question_progress.aggregate(pipeline)
+        result = await cursor.to_list(length=1)
+        if result:
+            return {
+                "bookmarked": result[0]["bookmarked"],
+                "mastered": result[0]["mastered"],
+                "review": result[0]["review"],
+                "answered": result[0]["answered"],
+                "total": result[0]["total"],
+            }
+        return {"bookmarked": 0, "mastered": 0, "review": 0, "answered": 0, "total": 0}
+
+    async def get_user_progress_batch(
+        self, user_id: str, question_ids: list[str]
+    ) -> dict[str, UserQuestionProgress]:
+        db = self._database()
+        cursor = db.user_question_progress.find(
+            {"user_id": user_id, "question_id": {"$in": question_ids}}
+        )
+        result: dict[str, UserQuestionProgress] = {}
+        async for doc in cursor:
+            prog = UserQuestionProgress(**doc)
+            result[prog.question_id] = prog
+        return result
