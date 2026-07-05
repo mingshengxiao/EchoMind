@@ -12,6 +12,7 @@ frontend/out/
 frontend/.env.local
 frontend/.env*.local
 npm-debug.log*
+frontend/tsconfig.tsbuildinfo
 
 # Env
 .env
