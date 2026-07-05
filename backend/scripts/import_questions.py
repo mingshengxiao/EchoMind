@@ -157,8 +157,13 @@ def parse_file(filepath: str) -> list[tuple[str, str]]:
     text = re.sub(r"^---[\s\S]*?---\n*", "", text).strip()
 
     results = parse_format_a(text, filepath)
-    if not results:
-        results = parse_format_b(text, filepath)
+    results_b = parse_format_b(text, filepath)
+
+    # Prefer the format that yields more results — format A can falsely
+    # match numbered items inside answer text (e.g. "1. 技术要点" in
+    # 微前端.md), short-circuiting format B which would extract correctly.
+    if results_b and len(results_b) > len(results):
+        results = results_b
 
     return results
 
