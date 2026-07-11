@@ -2,12 +2,20 @@
 
 import { BrainCircuit, LogIn, LogOut } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth-context";
 
 export function SiteHeader() {
   const { user, isGuest, logout } = useAuth();
+  const pathname = usePathname();
+  const navigation = [
+    { href: "/resume-qa", label: "简历问答" },
+    { href: "/questions-bank", label: "面试题集" },
+    { href: "/#features", label: "功能亮点", active: pathname === "/" },
+  ];
+
   return (
     <header className="sticky top-0 z-30 border-b border-zinc-200/80 bg-white/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
@@ -17,16 +25,25 @@ export function SiteHeader() {
           </span>
           EchoMind
         </Link>
-        <nav className="hidden items-center gap-6 text-sm font-medium text-zinc-600 md:flex" aria-label="主导航">
-          <Link className="transition-colors duration-200 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand" href="/resume-qa">
-            简历问答
-          </Link>
-          <Link className="transition-colors duration-200 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand" href="/questions-bank">
-            面试题集
-          </Link>
-          <Link className="transition-colors duration-200 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand" href="/#features">
-            功能亮点
-          </Link>
+        <nav className="hidden items-center gap-1 text-sm font-medium md:flex" aria-label="主导航">
+          {navigation.map((item) => {
+            const isActive = item.active ?? pathname === item.href;
+
+            return (
+              <Link
+                key={item.href}
+                aria-current={isActive ? "page" : undefined}
+                className={`rounded-lg px-3 py-2 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
+                  isActive
+                    ? "bg-brand/10 font-semibold text-brand shadow-sm"
+                    : "text-zinc-600 hover:bg-zinc-100 hover:text-brand"
+                }`}
+                href={item.href}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
         <div className="flex items-center gap-2">
           {user ? (
