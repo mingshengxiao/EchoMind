@@ -1,23 +1,18 @@
 # Python
 __pycache__/
 *.py[cod]
-backend/.venv/
-backend/.env
+.venv/
+.env
 .pytest_cache/
 
 # Node / Next.js
-frontend/node_modules/
-frontend/.next/
-frontend/out/
-frontend/.env.local
-frontend/.env*.local
-npm-debug.log*
-frontend/tsconfig.tsbuildinfo
-
-# Env
-.env
+node_modules/
+.next/
+out/
 .env.local
-.env.example
+.env*.local
+npm-debug.log*
+tsconfig.tsbuildinfo
 
 # Tooling
 .vercel/
@@ -25,11 +20,11 @@ frontend/tsconfig.tsbuildinfo
 
 # AI
 .claude
-.venv
 .agents/
 .tmp-agent-skills/
 
 # Brainstorming assets
 .superpowers/
-.vercel
-.env*
+
+# Frontend leftovers
+frontend/
