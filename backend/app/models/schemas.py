@@ -125,3 +125,40 @@ class SaveAnswerRequest(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     repository: str
+
+
+class SkillModuleResponse(BaseModel):
+    id: str
+    module_type: str
+    name: str
+    icon: str
+    skill_count: int
+    trend: float
+    updated_at: datetime
+
+
+class SkillDataResponse(BaseModel):
+    id: str
+    skill_name: str
+    category: str
+    demand_count: int
+    trend: float
+    rank: int
+
+
+class WordCloudDataResponse(BaseModel):
+    modules: list[SkillModuleResponse]
+    skills: list[SkillDataResponse]
+    module_type: str
+    updated_at: datetime
+
+
+class RefreshWordCloudRequest(BaseModel):
+    module_type: str = Field(description="要刷新的模块类型：frontend/backend/ai/mobile/devops/data")
+
+
+class RefreshWordCloudResponse(BaseModel):
+    success: bool
+    module_type: str
+    skill_count: int
+    message: str

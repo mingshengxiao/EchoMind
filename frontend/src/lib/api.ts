@@ -5,13 +5,17 @@ import type {
   QuestionBankListResponse,
   QuestionBankTopic,
   QuestionListResponse,
+  RefreshWordCloudResponse,
   ResumeListItem,
   ResumeUploadResponse,
   SSEEvent,
   User,
+  WordCloudDataResponse,
 } from "@/types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL ??
+  (typeof window !== "undefined" ? "" : "http://localhost:8000");
 export const AUTH_UNAUTHORIZED_EVENT = "echomind:unauthorized";
 
 export class ApiError extends Error {
@@ -202,5 +206,16 @@ export const api = {
 
     getProgress: () =>
       request<ProgressStats>("/api/v1/questions-bank/progress"),
+  },
+
+  wordcloud: {
+    getData: (moduleType: string = "frontend") =>
+      request<WordCloudDataResponse>(`/api/v1/wordcloud?module_type=${moduleType}`),
+
+    refresh: (moduleType: string) =>
+      request<RefreshWordCloudResponse>("/api/v1/wordcloud/refresh", {
+        method: "POST",
+        body: JSON.stringify({ module_type: moduleType }),
+      }),
   },
 };

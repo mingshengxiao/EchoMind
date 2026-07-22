@@ -12,6 +12,7 @@ export function SiteHeader() {
   const pathname = usePathname();
   const navigation = [
     { href: "/resume-qa", label: "简历问答" },
+    { href: "/resume-wordcloud", label: "简历词云" },
     { href: "/questions-bank", label: "面试题集" },
     { href: "/#features", label: "功能亮点", active: pathname === "/" },
   ];

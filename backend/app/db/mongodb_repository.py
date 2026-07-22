@@ -7,6 +7,8 @@ from app.models.domain import (
     QuestionBankItem,
     QuestionBankTopic,
     Resume,
+    SkillData,
+    SkillModule,
     User,
     UserQuestionProgress,
 )
@@ -35,6 +37,9 @@ class MongoRepository(AbstractRepository):
         await self.db.question_bank_items.create_index([("question_text", "text"), ("reference_answer", "text")])
         await self.db.user_question_progress.create_index("user_id")
         await self.db.user_question_progress.create_index([("user_id", 1), ("question_id", 1)], unique=True)
+        await self.db.skill_modules.create_index("module_type", unique=True)
+        await self.db.skill_data.create_index("module_type")
+        await self.db.skill_data.create_index([("module_type", 1), ("rank", 1)])
 
     async def close(self) -> None:
         if self.client is not None:
@@ -209,3 +214,39 @@ class MongoRepository(AbstractRepository):
             prog = UserQuestionProgress(**doc)
             result[prog.question_id] = prog
         return result
+
+    async def get_skill_modules(self) -> list[SkillModule]:
+        cursor = self._database().skill_modules.find().sort("module_type", 1)
+        return [SkillModule(**doc) async for doc in cursor]
+
+    async def get_skill_module_by_type(self, module_type: str) -> SkillModule | None:
+        doc = await self._database().skill_modules.find_one({"module_type": module_type})
+        return SkillModule(**doc) if doc else None
+
+    async def upsert_skill_module(self, module: SkillModule) -> SkillModule:
+        module.updated_at = utc_now()
+        await self._database().skill_modules.update_one(
+            {"module_type": module.module_type},
+            {"$set": module.model_dump(mode="json")},
+            upsert=True,
+        )
+        return module
+
+    async def get_skills_by_module(self, module_type: str) -> list[SkillData]:
+        cursor = self._database().skill_data.find({"module_type": module_type}).sort("rank", 1)
+        return [SkillData(**doc) async for doc in cursor]
+
+    async def save_skills(self, skills: list[SkillData]) -> list[SkillData]:
+        if not skills:
+            return []
+        module_type = skills[0].module_type
+        now = utc_now()
+        for skill in skills:
+            skill.updated_at = now
+        await self._database().skill_data.delete_many({"module_type": module_type})
+        await self._database().skill_data.insert_many([skill.model_dump(mode="json") for skill in skills])
+        return skills
+
+    async def delete_skills_by_module(self, module_type: str) -> int:
+        result = await self._database().skill_data.delete_many({"module_type": module_type})
+        return result.deleted_count

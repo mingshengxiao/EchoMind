@@ -1,4 +1,7 @@
 {
+  "_comment": "DEPRECATED - Backend deployment is now handled by the root vercel.json. This file is kept for reference only."
+}
+{
     "builds": [
         {
             "src": "api/index.py",

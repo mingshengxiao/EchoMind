@@ -26,6 +26,10 @@ frontend/tsconfig.tsbuildinfo
 # AI
 .claude
 .venv
+.agents/
+.tmp-agent-skills/
 
 # Brainstorming assets
 .superpowers/
+.vercel
+.env*

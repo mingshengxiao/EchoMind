@@ -90,3 +90,27 @@ class GeneratedQuestion(BaseModel):
 
 class GeneratedQuestionList(BaseModel):
     questions: list[GeneratedQuestion] = Field(description="A list of 50 to 100 interview questions")
+
+
+SkillModuleType = Literal["frontend", "backend", "ai", "mobile", "devops", "data"]
+
+
+class SkillModule(BaseModel):
+    id: str = Field(default_factory=new_id)
+    module_type: SkillModuleType
+    name: str
+    icon: str = ""
+    skill_count: int = 0
+    trend: float = 0.0
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class SkillData(BaseModel):
+    id: str = Field(default_factory=new_id)
+    module_type: SkillModuleType
+    skill_name: str
+    category: str = ""
+    demand_count: int = 0
+    trend: float = 0.0
+    rank: int = 0
+    updated_at: datetime = Field(default_factory=utc_now)

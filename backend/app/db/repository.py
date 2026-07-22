@@ -5,6 +5,8 @@ from app.models.domain import (
     QuestionBankItem,
     QuestionBankTopic,
     Resume,
+    SkillData,
+    SkillModule,
     User,
     UserQuestionProgress,
 )
@@ -104,4 +106,28 @@ class AbstractRepository(ABC):
     async def get_user_progress_batch(
         self, user_id: str, question_ids: list[str]
     ) -> dict[str, UserQuestionProgress]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_skill_modules(self) -> list[SkillModule]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_skill_module_by_type(self, module_type: str) -> SkillModule | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def upsert_skill_module(self, module: SkillModule) -> SkillModule:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_skills_by_module(self, module_type: str) -> list[SkillData]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def save_skills(self, skills: list[SkillData]) -> list[SkillData]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def delete_skills_by_module(self, module_type: str) -> int:
         raise NotImplementedError

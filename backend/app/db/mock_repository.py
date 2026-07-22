@@ -6,6 +6,8 @@ from app.models.domain import (
     QuestionBankItem,
     QuestionBankTopic,
     Resume,
+    SkillData,
+    SkillModule,
     User,
     UserQuestionProgress,
     utc_now,
@@ -22,6 +24,8 @@ class MockRepository(AbstractRepository):
         self._question_bank_topics: dict[str, QuestionBankTopic] = {}  # key: name
         self._question_bank_items: dict[str, QuestionBankItem] = {}  # key: id
         self._user_progress: dict[str, UserQuestionProgress] = {}  # key: f"{user_id}:{question_id}"
+        self._skill_modules: dict[str, SkillModule] = {}  # key: module_type
+        self._skill_data: dict[str, list[SkillData]] = {}  # key: module_type
         self._lock = asyncio.Lock()
 
     async def create_user(self, user: User) -> User:
@@ -155,3 +159,34 @@ class MockRepository(AbstractRepository):
             if prog:
                 result[qid] = prog
         return result
+
+    async def get_skill_modules(self) -> list[SkillModule]:
+        return list(self._skill_modules.values())
+
+    async def get_skill_module_by_type(self, module_type: str) -> SkillModule | None:
+        return self._skill_modules.get(module_type)
+
+    async def upsert_skill_module(self, module: SkillModule) -> SkillModule:
+        async with self._lock:
+            module.updated_at = utc_now()
+            self._skill_modules[module.module_type] = module
+        return module
+
+    async def get_skills_by_module(self, module_type: str) -> list[SkillData]:
+        return self._skill_data.get(module_type, [])
+
+    async def save_skills(self, skills: list[SkillData]) -> list[SkillData]:
+        if not skills:
+            return []
+        async with self._lock:
+            module_type = skills[0].module_type
+            now = utc_now()
+            for skill in skills:
+                skill.updated_at = now
+            self._skill_data[module_type] = skills
+        return skills
+
+    async def delete_skills_by_module(self, module_type: str) -> int:
+        async with self._lock:
+            skills = self._skill_data.pop(module_type, [])
+            return len(skills)

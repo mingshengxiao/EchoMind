@@ -113,3 +113,36 @@ export interface SSEErrorEvent {
 }
 
 export type SSEEvent = SSEQuestionEvent | SSEProgressEvent | SSEDoneEvent | SSEErrorEvent;
+
+export interface SkillModule {
+  id: string;
+  module_type: string;
+  name: string;
+  icon: string;
+  skill_count: number;
+  trend: number;
+  updated_at: string;
+}
+
+export interface SkillData {
+  id: string;
+  skill_name: string;
+  category: string;
+  demand_count: number;
+  trend: number;
+  rank: number;
+}
+
+export interface WordCloudDataResponse {
+  modules: SkillModule[];
+  skills: SkillData[];
+  module_type: string;
+  updated_at: string;
+}
+
+export interface RefreshWordCloudResponse {
+  success: boolean;
+  module_type: string;
+  skill_count: number;
+  message: string;
+}
