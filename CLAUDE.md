@@ -21,7 +21,7 @@ python -m uvicorn app.main:app --reload --port 8000  # use python -m to bypass A
 ### Frontend (Next.js 14)
 
 ```bash
-cd frontend
+# Frontend is at project root (not in frontend/ subdirectory)
 npm install
 npm run dev    # dev server :3000
 npm run build  # production build
@@ -86,7 +86,7 @@ All API routes are under `/api/v1/`. Final paths:
 - Auth: `/api/v1/auth/register`, `/api/v1/auth/login`, `/api/v1/auth/me`
 - Resumes: `/api/v1/resumes/*` (CRUD) + `/api/v1/resumes/guest/process`
 - Questions bank: `/api/v1/questions-bank/topics`, `/api/v1/questions-bank/questions`, `/api/v1/questions-bank/progress`
-- Vercel serverless: `backend/api/index.py` wraps the FastAPI app
+- Vercel serverless: `api/index.py` wraps the FastAPI app (bridges to `backend/app/main.py`)
 
 ### Import script
 
