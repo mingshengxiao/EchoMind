@@ -12,6 +12,7 @@ import type {
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+export const AUTH_UNAUTHORIZED_EVENT = "echomind:unauthorized";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -24,9 +25,15 @@ function token() {
   return window.localStorage.getItem("echomind-token");
 }
 
+function notifyUnauthorized() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
+}
+
 async function parseResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: "网络请求失败" }));
+    if (response.status === 401) notifyUnauthorized();
     throw new ApiError(response.status, error.detail || "请求失败");
   }
   if (response.status === 204) return undefined as T;
@@ -118,6 +125,7 @@ export const api = {
     });
     if (!response.ok) {
       const err = await response.json().catch(() => ({ detail: "网络请求失败" }));
+      if (response.status === 401) notifyUnauthorized();
       throw new ApiError(response.status, err.detail || "请求失败");
     }
     yield* readSSEStream(response);

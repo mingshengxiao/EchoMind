@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { api } from "@/lib/api";
+import { AUTH_UNAUTHORIZED_EVENT, ApiError, api } from "@/lib/api";
 import type { User } from "@/types";
 
 interface AuthContextValue {
@@ -17,17 +17,68 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+function clearStoredAuth() {
+  window.localStorage.removeItem("echomind-token");
+  window.localStorage.removeItem("echomind-user");
+  window.localStorage.removeItem("echomind-guest");
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isGuest, setIsGuest] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = window.localStorage.getItem("echomind-user");
-    const storedGuest = window.localStorage.getItem("echomind-guest") === "true";
-    if (storedUser) setUser(JSON.parse(storedUser));
-    setIsGuest(storedGuest);
-    setIsLoading(false);
+    let isActive = true;
+
+    const handleUnauthorized = () => {
+      clearStoredAuth();
+      if (!isActive) return;
+      setUser(null);
+      setIsGuest(false);
+    };
+
+    async function restoreSession() {
+      const storedToken = window.localStorage.getItem("echomind-token");
+      const storedGuest = window.localStorage.getItem("echomind-guest") === "true";
+
+      if (!storedToken) {
+        window.localStorage.removeItem("echomind-user");
+        if (isActive) {
+          setUser(null);
+          setIsGuest(storedGuest);
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const currentUser = await api.me();
+        if (!isActive) return;
+        window.localStorage.setItem("echomind-user", JSON.stringify(currentUser));
+        window.localStorage.removeItem("echomind-guest");
+        setUser(currentUser);
+        setIsGuest(false);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          handleUnauthorized();
+          return;
+        }
+        if (!isActive) return;
+        setUser(null);
+        setIsGuest(false);
+      } finally {
+        if (isActive) setIsLoading(false);
+      }
+    }
+
+    window.addEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
+    void restoreSession();
+
+    return () => {
+      isActive = false;
+      window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
+    };
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -52,8 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsGuest(false);
       },
       logout: () => {
-        window.localStorage.removeItem("echomind-token");
-        window.localStorage.removeItem("echomind-user");
+        clearStoredAuth();
         setUser(null);
         setIsGuest(false);
       },
