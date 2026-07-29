@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -7,13 +8,25 @@ from app.api.v1 import auth, resumes, wordcloud
 from app.api.v1.questions_bank import router as questions_bank_router
 from app.config import get_settings
 from app.db.factory import create_repository
+from app.db.mock_repository import MockRepository
 from app.models.schemas import HealthResponse
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
-    repository = await create_repository(settings)
+    try:
+        repository = await create_repository(settings)
+        logger.info("Repository '%s' connected successfully", repository.name)
+    except Exception:
+        logger.exception(
+            "Failed to connect repository (MONGODB_URL=%s), "
+            "falling back to MockRepository",
+            "***set***" if settings.mongodb_url else "(empty)",
+        )
+        repository = MockRepository()
     app.state.repository = repository
     yield
     await repository.close()
