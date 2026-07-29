@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
         logger.exception(
             "Failed to connect repository (MONGODB_URL=%s), "
             "falling back to MockRepository",
-            "***set***" if settings.mongodb_url else "(empty)",
+            "***set***" if settings.effective_mongodb_url else "(empty)",
         )
         repository = MockRepository()
     app.state.repository = repository

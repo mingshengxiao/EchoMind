@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_model: str = "deepseek-v4-flash"
     mongodb_url: str = ""
+    mongodb_uri: str = ""
     mongodb_database: str = "echomind"
     jwt_secret: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
@@ -32,6 +33,10 @@ class Settings(BaseSettings):
     @property
     def max_upload_bytes(self) -> int:
         return self.max_upload_mb * 1024 * 1024
+
+    @property
+    def effective_mongodb_url(self) -> str:
+        return self.mongodb_url or self.mongodb_uri
 
 
 @lru_cache
